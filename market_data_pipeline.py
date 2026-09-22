@@ -76,4 +76,13 @@ new_rows = rows_to_store["date"].dt.strftime("%Y-%m-%d")
 rows_to_store["date"] = new_rows
 
 ordered_rows = rows_to_store[columns]
+records = ordered_rows.itertuples(index=False, name=None)
 
+connection.executemany(insert_sql, records)
+connection.commit()
+
+select_sql = "SELECT * FROM daily_prices"
+cursor = connection.execute(select_sql)
+stored_rows = cursor.fetchall()
+print(stored_rows)
+connection.close()
