@@ -1,3 +1,4 @@
+import sqlite3 as sq
 import pandas as pd
 
 df = pd.read_csv('sample_prices.csv')
@@ -59,3 +60,20 @@ if len(missing) == 0:
     failures = validation_report.sum(axis=0)
 else:
     print(f"{missing} columns are missing.")
+
+connection = sq.connect("market_data.db")
+
+create_table_sql = ("CREATE TABLE IF NOT EXISTS daily_prices (symbol TEXT NOT NULL, date TEXT NOT NULL, volume INTEGER NOT NULL, "
+"close REAL NOT NULL, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, PRIMARY KEY (symbol, date))")
+
+connection.execute(create_table_sql)
+
+insert_sql = ("INSERT INTO daily_prices (symbol, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)")
+
+rows_to_store = val_rows.copy()
+
+new_rows = rows_to_store["date"].dt.strftime("%Y-%m-%d")
+rows_to_store["date"] = new_rows
+
+ordered_rows = rows_to_store[columns]
+
