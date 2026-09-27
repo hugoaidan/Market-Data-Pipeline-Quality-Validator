@@ -68,8 +68,6 @@ create_table_sql = ("CREATE TABLE IF NOT EXISTS daily_prices (symbol TEXT NOT NU
 
 connection.execute(create_table_sql)
 
-insert_sql = ("INSERT INTO daily_prices (symbol, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)")
-
 rows_to_store = val_rows.copy()
 
 new_rows = rows_to_store["date"].dt.strftime("%Y-%m-%d")
@@ -78,8 +76,32 @@ rows_to_store["date"] = new_rows
 ordered_rows = rows_to_store[columns]
 records = ordered_rows.itertuples(index=False, name=None)
 
-connection.executemany(insert_sql, records)
+def import_records(connection, records):
+    insert_sql = ("INSERT INTO daily_prices (symbol, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    lookup_sql = ("SELECT symbol, date, open, high, low, close, volume FROM daily_prices WHERE symbol = ? AND date = ?")
+    skipped = 0
+    inserted = 0
+    conflicts = 0
+
+    for record in records:
+        lookup_values = (record[0], record[1])
+        cursor = connection.execute(lookup_sql, lookup_values)
+        existing_record = cursor.fetchone()
+
+        if existing_record is None:
+            connection.execute(insert_sql, record)
+            inserted += 1
+        elif existing_record == record:
+            skipped += 1
+        else:
+            print(f"ERROR, conflict for {record[0]} and {record[1]}")
+            conflicts += 1
+    
+    return inserted, skipped, conflicts
+
+inserted, skipped, conflicts = import_records(connection, records)
 connection.commit()
+print(f"Inserted: {inserted}\nSkipped: {skipped}\nConflicts: {conflicts}")
 
 select_sql = "SELECT * FROM daily_prices"
 cursor = connection.execute(select_sql)
