@@ -1,7 +1,6 @@
 import sqlite3 as sq
 import pandas as pd
 
-df = pd.read_csv('sample_prices.csv')
 columns = ['symbol','date','open','high','low','close','volume']
 numeric_columns = ['open','high','low','close','volume']
 
@@ -49,33 +48,6 @@ def validation(df):
 
     return validation_report
 
-missing = column_check(columns, df)
-
-if len(missing) == 0:
-    df = normalize_data(df)
-    validation_report = validation(df)
-    inv_rows = validation_report.any(axis=1)
-    rejected_rows = df[inv_rows]
-    val_rows = df[~inv_rows]
-    failures = validation_report.sum(axis=0)
-else:
-    print(f"{missing} columns are missing.")
-
-connection = sq.connect("market_data.db")
-
-create_table_sql = ("CREATE TABLE IF NOT EXISTS daily_prices (symbol TEXT NOT NULL, date TEXT NOT NULL, volume INTEGER NOT NULL, "
-"close REAL NOT NULL, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, PRIMARY KEY (symbol, date))")
-
-connection.execute(create_table_sql)
-
-rows_to_store = val_rows.copy()
-
-new_rows = rows_to_store["date"].dt.strftime("%Y-%m-%d")
-rows_to_store["date"] = new_rows
-
-ordered_rows = rows_to_store[columns]
-records = ordered_rows.itertuples(index=False, name=None)
-
 def import_records(connection, records):
     insert_sql = ("INSERT INTO daily_prices (symbol, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)")
     lookup_sql = ("SELECT symbol, date, open, high, low, close, volume FROM daily_prices WHERE symbol = ? AND date = ?")
@@ -99,12 +71,62 @@ def import_records(connection, records):
     
     return inserted, skipped, conflicts
 
-inserted, skipped, conflicts = import_records(connection, records)
-connection.commit()
-print(f"Inserted: {inserted}\nSkipped: {skipped}\nConflicts: {conflicts}")
 
-select_sql = "SELECT * FROM daily_prices"
-cursor = connection.execute(select_sql)
-stored_rows = cursor.fetchall()
-print(stored_rows)
-connection.close()
+def main(): 
+    try:
+        df = pd.read_csv('sample_prices.csv')
+    except FileNotFoundError as error:
+        print(f"ERROR, {error}")
+        return
+    except pd.errors.EmptyDataError as error:
+        print(f"CSV file is empty or has no header, {error}")
+        return
+    except pd.errors.ParserError as error: 
+        print(f"CSV could not be parsed, {error}")
+        return
+    
+    missing = column_check(columns, df)
+    if len(missing) == 0:
+        df = normalize_data(df)
+        validation_report = validation(df)
+        inv_rows = validation_report.any(axis=1)
+        rejected_rows = df[inv_rows]
+        val_rows = df[~inv_rows]
+        failures = validation_report.sum(axis=0)
+    else:
+        print(f"{missing} columns are missing.")
+        return
+
+    rows_to_store = val_rows.copy()
+    new_rows = rows_to_store["date"].dt.strftime("%Y-%m-%d")
+    rows_to_store["date"] = new_rows
+    ordered_rows = rows_to_store[columns]
+    records = ordered_rows.itertuples(index=False, name=None)
+
+    try:
+        connection = sq.connect('market_data.db')
+    except sq.Error as error:
+        print(f"ERROR, {error}")
+        return
+
+    create_table_sql = ("CREATE TABLE IF NOT EXISTS daily_prices (symbol TEXT NOT NULL, date TEXT NOT NULL, volume INTEGER NOT NULL, "
+    "close REAL NOT NULL, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, PRIMARY KEY (symbol, date))")
+
+    try:
+        connection.execute(create_table_sql)
+        inserted, skipped, conflicts = import_records(connection, records)
+        connection.commit()
+    except sq.Error as error:
+        connection.rollback()
+        print(f"ERROR, {error}")
+    else: 
+        print(f"Inserted: {inserted}\nSkipped: {skipped}\nConflicts: {conflicts}")
+        select_sql = "SELECT * FROM daily_prices"
+        cursor = connection.execute(select_sql)
+        stored_rows = cursor.fetchall()
+        print(stored_rows)
+    finally:
+        connection.close()
+
+if __name__ == "__main__":
+    main()
