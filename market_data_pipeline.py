@@ -1,4 +1,5 @@
 import sqlite3 as sq
+
 import pandas as pd
 
 columns = ['symbol','date','open','high','low','close','volume']
@@ -46,7 +47,12 @@ def validation(df):
     price_columns = ['open', 'high', 'low', 'close']
     inv_nonpositive_prices = (df[price_columns] <= 0).any(axis=1)
 
-    check = {"invalid_dates": inv_dates, "invalid_symbols": inv_symbols, "invalid_numeric": inv_numeric_rows, "invalid_prices": inv_prices, "negative_volume": inv_volume, "duplicate": inv_duplicates, "nonpositive_prices": inv_nonpositive_prices}
+    inv_infinite = (df[numeric_columns].isin([float("inf"), float("-inf")])).any(axis=1)
+
+    inv_fractional_volume = ((df["volume"] % 1 != 0) & df["volume"].notna() & ~df["volume"].isin([float("inf"), float("-inf")]))
+
+    check = {"invalid_dates": inv_dates, "invalid_symbols": inv_symbols, "invalid_numeric": inv_numeric_rows, "invalid_prices": inv_prices, "negative_volume": inv_volume, 
+             "duplicate": inv_duplicates, "nonpositive_prices": inv_nonpositive_prices, "infinite_numeric": inv_infinite, "fractional_volume": inv_fractional_volume}
     validation_report = pd.DataFrame(data=check)
 
     return validation_report
