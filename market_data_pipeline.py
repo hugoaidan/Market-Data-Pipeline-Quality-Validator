@@ -43,7 +43,10 @@ def validation(df):
     duplicate_columns = ['symbol', 'date']
     inv_duplicates = df[duplicate_columns].duplicated(keep=False)
 
-    check = {"invalid_dates": inv_dates, "invalid_symbols": inv_symbols, "invalid_numeric": inv_numeric_rows, "invalid_prices": inv_prices, "negative_volume": inv_volume, "duplicate": inv_duplicates}
+    price_columns = ['open', 'high', 'low', 'close']
+    inv_nonpositive_prices = (df[price_columns] <= 0).any(axis=1)
+
+    check = {"invalid_dates": inv_dates, "invalid_symbols": inv_symbols, "invalid_numeric": inv_numeric_rows, "invalid_prices": inv_prices, "negative_volume": inv_volume, "duplicate": inv_duplicates, "nonpositive_prices": inv_nonpositive_prices}
     validation_report = pd.DataFrame(data=check)
 
     return validation_report
@@ -74,7 +77,7 @@ def import_records(connection, records):
 
 def main(): 
     try:
-        df = pd.read_csv('sample_prices.csv')
+        df = pd.read_csv('sample_prices.csv', dtype={"symbol" : "string"})
     except FileNotFoundError as error:
         print(f"ERROR, {error}")
         return
@@ -84,7 +87,7 @@ def main():
     except pd.errors.ParserError as error: 
         print(f"CSV could not be parsed, {error}")
         return
-    
+
     missing = column_check(columns, df)
     if len(missing) == 0:
         df = normalize_data(df)
@@ -93,6 +96,7 @@ def main():
         rejected_rows = df[inv_rows]
         val_rows = df[~inv_rows]
         failures = validation_report.sum(axis=0)
+        print(f"Total Rows: {len(df)}\nAccepted Rows: {len(val_rows)}\nRejected Rows: {len(rejected_rows)}\nFailures by check: {failures}\n")
     else:
         print(f"{missing} columns are missing.")
         return
@@ -121,10 +125,6 @@ def main():
         print(f"ERROR, {error}")
     else: 
         print(f"Inserted: {inserted}\nSkipped: {skipped}\nConflicts: {conflicts}")
-        select_sql = "SELECT * FROM daily_prices"
-        cursor = connection.execute(select_sql)
-        stored_rows = cursor.fetchall()
-        print(stored_rows)
     finally:
         connection.close()
 
