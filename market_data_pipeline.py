@@ -13,8 +13,8 @@ def column_check(columns, df):
     return missing_col
 
 def normalize_data(df):
-    new_date = pd.to_datetime(df["date"], errors="coerce")
-    df["date"] = new_date
+    new_date = pd.to_datetime(df["date"], errors="coerce", format="mixed")
+    df["date"] = new_date.dt.normalize()
 
     for column in numeric_columns:
         new = pd.to_numeric(df[column], errors="coerce")
