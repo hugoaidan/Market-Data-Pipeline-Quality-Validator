@@ -1,5 +1,4 @@
-import sqlite3 as sq
-
+import sqlite3 as sq  # noqa: I001
 import pandas as pd
 
 columns = ['symbol','date','open','high','low','close','volume']
