@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated SQLite database files
+market_data.db
+market_data.db-journal
+market_data.db-wal
+market_data.db-shm
